@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #ifdef DEBUG
     #define UNUSED(x) (void)(x) //!< Macro to suppress unused variable warnings
@@ -22,6 +23,7 @@
 #endif
 
 #define CHECK_ALLOC(ptr) if (!ptr) { ERROR("Memory allocation failed\n"); exit(EXIT_FAILURE); } //!< Macro to check memory allocation
+
 
 
 #endif // COMMON_H
