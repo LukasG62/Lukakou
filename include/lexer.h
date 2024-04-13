@@ -27,7 +27,8 @@ typedef enum {
     TOKEN_COMMENT, /*!< Comment token */
 } token_type_t;
 
-#define KEYWORDS "float int char void ifnt elif if else while for return foreach dowhile array string"
+#define LEXER_KEYWORDS "float int char void ifnt elif if else while for return foreach dowhile array string"
+#define LEXER_LOGICAL_OPERATORS "NOT OR AND"
 
 /**
  * @struct token_t
