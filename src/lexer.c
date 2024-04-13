@@ -76,6 +76,19 @@ void read_char(lexer_t *lexer, token_t *token);
 void read_operator(lexer_t *lexer, token_t *token);
 
 /**
+ * @fn int is_operator(lexer_t *lexer)
+ * @brief Check if the current character is an operator
+ * Here's the list of operators in Lukakou:
+ * Math operators: +, -, *, /, %
+ * Comparison operators: ==, !=, <, >, <=, >=
+ * Logical operators: OR, AND, NOT
+ * Assignment operators: =, +=, -=, *=, /=
+ * @param lexer Lexer
+ * @return the length of the operator if it is an operator, 0 otherwise 
+*/
+int is_operator(lexer_t *lexer);
+
+/**
  * @fn custom_strnstr(const char *haystack, const char *needle)
  * @brief Custom implementation of strnstr for non-NULL terminated strings
  * @param haystack Haystack string
@@ -155,11 +168,22 @@ token_t next_token(lexer_t *lexer) {
         read_char(lexer, &token);
         return token;
     }
+
     // Check if the current character is an separator
     if(lexer->content[currCursor] == '(' || lexer->content[currCursor] == ')' || lexer->content[currCursor] == '{' || lexer->content[currCursor] == '}' || lexer->content[currCursor] == ',') {
         token.type = TOKEN_SEPARATOR;
         lexer->cursor++;
         token.textLen = 1;
+        return token;
+    }
+
+    // Check if the current character is an operator
+    int operatorLen = is_operator(lexer);
+    if(operatorLen > 0) {
+        token.type = TOKEN_OPERATOR;
+        lexer->cursor += operatorLen;
+        token.textLen = operatorLen;
+        token.text = lexer->content + currCursor;
         return token;
     }
 
@@ -233,6 +257,7 @@ void skip_comment(lexer_t *lexer) {
     // - Multi-line comments starting with /* and ending with */
 
     // First we check if the current character is a /
+    int intialCursor = lexer->cursor;
     while(lexer->content[lexer->cursor] == '/') {
         // Check if single line comment
         if(lexer->cursor + 1 < lexer->contentLen && lexer->content[lexer->cursor + 1] == '/') {
@@ -250,6 +275,12 @@ void skip_comment(lexer_t *lexer) {
             lexer->cursor += 2;
         }
         skip_whitespace(lexer);
+
+        // if the cursor didn't move, it means that the / is not part of a comment
+        if(intialCursor == lexer->cursor) {
+            break;
+        }
+
     }
 }
 
@@ -271,13 +302,20 @@ void read_identifier(lexer_t *lexer, token_t *token) {
     token->textLen = lexer->cursor - (token->text - lexer->content);
 
     // The actual text may be a keyword so we check if it is
-    if(custom_strnstr(KEYWORDS, token->text, token->textLen) != NULL) {
+    if(custom_strnstr(LEXER_KEYWORDS, token->text, token->textLen) != NULL) {
         // We set the token type to TOKEN_KEYWORD
         token->type = TOKEN_KEYWORD;
-    } else {
-        // We set the token type to TOKEN_IDENTIFIER
-        token->type = TOKEN_IDENTIFIER;
+        return;
+    } 
+
+    // The actuel text may be an logical operator so we check if it is
+    if(custom_strnstr(LEXER_LOGICAL_OPERATORS, token->text, token->textLen) != NULL) {
+        // We set the token type to TOKEN_OPERATOR
+        token->type = TOKEN_OPERATOR;
+        return;
     }
+
+    token->type = TOKEN_IDENTIFIER;
 }
 
 /**
@@ -310,21 +348,18 @@ void read_number(lexer_t *lexer, token_t *token) {
  * @return void
 */
 void read_string(lexer_t *lexer, token_t *token) {
-    // First we check if the current character is a "
-    if(lexer->content[lexer->cursor] == '"') {
-        // We move to the next character
+    // We move to the next character
+    lexer->cursor++;
+    // We look for the end of the string but we ignore escaped double quotes
+    while(lexer->cursor < lexer->contentLen && lexer->content[lexer->cursor] != '"' && lexer->content[lexer->cursor-1] != '\\') {
         lexer->cursor++;
-        // We look for the end of the string
-        while(lexer->cursor < lexer->contentLen && lexer->content[lexer->cursor] != '"') {
-            lexer->cursor++;
-        }
-        // We move to the next character
-        lexer->cursor++;
-        // We set the token type to TOKEN_STRING
-        token->type = TOKEN_STRING;
-        // We set the token text length
-        token->textLen = lexer->cursor - (token->text - lexer->content);
     }
+    // We move to the next character
+    lexer->cursor++;
+    // We set the token type to TOKEN_STRING
+    token->type = TOKEN_STRING;
+    // We set the token text length
+    token->textLen = lexer->cursor - (token->text - lexer->content);
 }
 
 /**
@@ -355,17 +390,28 @@ void read_char(lexer_t *lexer, token_t *token) {
 }
 
 /**
- * @fn read_operator(lexer_t *lexer, token_t *token)
- * @brief Read an operator from the source code
- * An operator is a sequence of special characters
+ * @fn int is_operator(lexer_t *lexer)
+ * @brief Check if the current character is an operator
+ * Here's the list of operators in Lukakou:
+ * Math operators: +, -, *, /, %
+ * Comparison operators: ==, !=, <, >, <=, >=
+ * Assignment operators: =, +=, -=, *=, /=
  * @param lexer Lexer
- * @param token Token
- * @return void
+ * @return the length of the operator if it is an operator, 0 otherwise 
 */
-void read_operator(lexer_t *lexer, token_t *token) {
-    UNIMPLEMENTED("read_operator");
+int is_operator(lexer_t *lexer) {
+    // We check if the current character is '+', '-', '*', '/', '%', '=', '<', '>'
+    if(lexer->content[lexer->cursor] == '+' || lexer->content[lexer->cursor] == '-' || lexer->content[lexer->cursor] == '*' || lexer->content[lexer->cursor] == '/' || lexer->content[lexer->cursor] == '%' || lexer->content[lexer->cursor] == '=' || lexer->content[lexer->cursor] == '<' || lexer->content[lexer->cursor] == '>') {
+        // We check if the next character is '='
+        if(lexer->cursor + 1 < lexer->contentLen && lexer->content[lexer->cursor + 1] == '=') {
+            // We return 2 if the next character is '='
+            return 2;
+        }
+        // We return 1 if the next character is not '='
+        return 1;
+    }
+    return 0;
 }
-
 
 /**
  * @fn custom_strnstr(const char *haystack, const char *needle)
