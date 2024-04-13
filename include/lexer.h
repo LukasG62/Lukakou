@@ -27,6 +27,9 @@ typedef enum {
     TOKEN_COMMENT, /*!< Comment token */
 } token_type_t;
 
+#define LEXER_KEYWORDS "float int char void ifnt elif if else while for return foreach dowhile array string"
+#define LEXER_LOGICAL_OPERATORS "NOT OR AND"
+
 /**
  * @struct token_t
  * @brief Token structure
@@ -65,6 +68,14 @@ lexer_t create_lexer(char *content, size_t contentLen);
  * @return The next token
  */
 token_t next_token(lexer_t *lexer);
+
+/**
+ * @fn void print_token_type(token_type_t type)
+ * @brief Print a token type
+ * @param type Token type
+ * @return void
+ */
+const char *str_token_type(token_type_t type);
 
 
 #endif // LEXER_H

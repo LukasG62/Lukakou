@@ -2,11 +2,12 @@
 # Programs to build
 PROG=lukac
 # Test programs to build
-TEST_PROG=
+TEST_PROG=test_lexer
 # Path to bin directory
 BIN_DIR=bin
 # Programs path
 PROG_PATH=$(addprefix $(BIN_DIR)/, $(PROG))
+PROG_TEST_PATH=$(addprefix $(BIN_DIR)/, $(TEST_PROG))
 # Path to source codes
 SRC_DIR=src
 # Path to header files
@@ -15,6 +16,8 @@ INCLUDE_DIR=include
 OBJ_DIR=obj
 # Path to lib files
 LIB_DIR=lib
+# Path to test files
+TEST_DIR=test
 
 # Compilation flags
 CPFLAGS ?=-I$(INCLUDE_DIR) -Wall -g -DDEBUG
@@ -27,7 +30,7 @@ CC?=gcc
 # Default target
 .PHONY: all clean docs
 
-all: docs $(PROG_PATH)
+all: docs $(PROG_PATH) $(PROG_TEST_PATH)
 	@echo "Build successful."
 	@echo "Run $(PROG_PATH) to execute the program."
 
@@ -61,3 +64,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INCLUDE_DIR)/%.h $(INCLUDE_DIR)/common.h
 	@mkdir -p $(OBJ_DIR)
 	@echo "CC\t$<"
 	@$(CC) $(CPFLAGS) -c $< -o $@
+
+# Rule for building test programs
+$(BIN_DIR)/%: $(TEST_DIR)/%.c $(LIB_DIR)/libcompiler.a
+	@mkdir -p $(BIN_DIR)
+	@echo "CC\t$<"
+	@$(CC) $(CPFLAGS) $< -o $@ $(LD_FLAGS)
