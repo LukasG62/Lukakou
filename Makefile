@@ -2,7 +2,7 @@
 # Programs to build
 PROG=lukac
 # Test programs to build
-TEST_PROG=test_lexer
+TEST_PROG=test_lexer test_ast
 # Path to bin directory
 BIN_DIR=bin
 # Programs path
