@@ -9,6 +9,19 @@
 
 #include "common.h"
 
+// Graphviz constants
+
+#define GVIZ_INTERNAL_NODE_STYLE "shape=box, style=filled, fillcolor=lightblue"
+#define GVIZ_LEAF_NODE_STYLE "shape=ellipse, style=filled, fillcolor=lightgreen"
+#define GVIZ_EDGE_STYLE "color=black"
+#define GVIZ_FILE_HEADER "digraph G {\n"
+#define GVIZ_FILE_FOOTER "}\n"
+// Using the memory address of the node as the node name to get unique node names
+#define GVIZ_ADD_EDGE(file, from, to) fprintf(file, "\"%p\" -> \"%p\" [%s];\n", from, to, GVIZ_EDGE_STYLE)
+#define GVIZ_ADD_EDGE_TEXT(file, from, to, text) fprintf(file, "\"%p\" -> \"%p\" [%s, label=\"%s\"];\n", from, to, GVIZ_EDGE_STYLE, text)
+#define GVIZ_ADD_NODE(file, node, style) fprintf(file, "\"%p\" [%s];\n", node, style)
+#define GVIZ_ADD_NODE_TEXT(file, node, style, text) fprintf(file, "\"%p\" [%s, label=\"%s\"];\n", node, style, text)
+
 /**
  * @enum ast_node_type_t
  * @brief AST node type enumeration
@@ -31,15 +44,18 @@ typedef enum {
     AST_NODE_IF, /*!< If node */
     AST_NODE_IFNT, /*!< If not node */
 
+    // Misc (idk how to implement them yet)
+    AST_NODE_SYSTEM_INTERFACES, /*!< System interfaces node (System.io, System.syscall, etc) */
+    AST_NODE_SYSTEM_SUBINTERFACE,
+
     // Variables (leaves of the tree)
+    AST_NODE_LEAVES, /*!< Leaves of the tree */
     AST_NODE_VARIABLE, /*!< Variable node */
     AST_NODE_ARRAY, /*!< Array node */
     AST_NODE_STRING, /*!< String node */
     AST_NODE_CONSTANT, /*!< Constant node */
+    AST_NODE_OPERATOR, /*!< Operator node */
 
-    // Misc (idk how to implement them yet)
-    AST_NODE_SYSTEM_INTERFACES, /*!< System interfaces node (System.io, System.syscall, etc) */
-    AST_NODE_SYSTEM_SUBINTERFACE
 } ast_node_type_t;
 
 /**
@@ -178,10 +194,11 @@ typedef struct {
     struct __ast_node_t *arrayIndex; /*!< Array index */
 } ast_node_array_t;
 
-typedef ast_node_variable_t ast_node_string_t; /*!< String node is the same as variable node */
+typedef struct {
+    char *value; /*!< Constant value */
+} ast_node_constant_t; /*!< Constant node is the same as variable node */
 
-typedef ast_node_variable_t ast_node_constant_t; /*!< Constant node is the same as variable node */
-
+typedef ast_node_constant_t ast_node_string_t; /*!< String node is the same as constant node */
 
 /**
  * @struct ast_node_operator_t
@@ -199,6 +216,9 @@ typedef struct __ast_node_t {
     // like this we can make a functino call next_ast_node(node) that will return the next node in the tree
     struct __ast_node_t *parent; /*!< Parent node (NULL if root node) */
     ast_node_type_t type; /*!< Node type */
+    void *data;
+    
+    // all possible data for a node    
     union {
         ast_node_block_t block; /*!< Block node */
         ast_node_function_t function; /*!< Function node */
@@ -214,7 +234,7 @@ typedef struct __ast_node_t {
         ast_node_string_t string; /*!< String node */
         ast_node_constant_t constant; /*!< Constant node */
         ast_node_operator_t operator; /*!< Operator node */
-    } data; /*!< Node data */
+    } _udata;
 } ast_node_t;
 
 /**
@@ -233,6 +253,135 @@ typedef struct __ast_stack_t {
  * @return A new AST node
  */
 ast_node_t *create_ast_node(ast_node_type_t type);
+
+/**
+ * @fn ast_node_t *create_ast_operator_node(op_type_t type, ast_node_t *left, ast_node_t *right)
+ * @brief Create a new AST operator node
+ * @param type Operator type
+ * @param left Left operand
+ * @param right Right operand
+ * @return A new AST operator node
+*/
+ast_node_t *create_ast_operator_node(op_type_t type, ast_node_t *left, ast_node_t *right);
+
+/**
+ * @fn ast_node_t *create_ast_variable_node(char *name);
+ * @brief Create a new AST variable node
+ * @param name Variable name
+ * @return A new AST variable node
+ */
+ast_node_t *create_ast_variable_node(char *name);
+
+/**
+ * @fn ast_node_t *create_ast_array_node(char *name, ast_node_t *index)
+ * @brief Create a new AST array node
+ * @param name Array name
+ * @param index Array index
+ * @return A new AST array node
+ */ 
+ast_node_t *create_ast_array_node(char *name, ast_node_t *index);
+
+/**
+ * @fn ast_node_t *create_ast_string_node(char *value)
+ * @brief Create a new AST string node
+ * @param value String value
+ * @return A new AST string node
+ */
+ast_node_t *create_ast_string_node(char *value);
+
+/**
+ * @fn ast_node_t *create_ast_constant_node(char *value)
+ * @brief Create a new AST constant node
+ * @param value Constant value
+ * @return A new AST constant node
+ */
+ast_node_t *create_ast_constant_node(char *value);
+
+/**
+ * @fn ast_node_t *create_ast_block_node(ast_node_t **nodes, size_t nodesLen)
+ * @brief Create a new AST block node
+ * @return A new AST block node
+ */
+ast_node_t *create_ast_block_node(ast_node_t **nodes, size_t nodesLen);
+
+/**
+ * @fn ast_node_t *create_ast_function_node(char *name, ast_node_t **args, size_t argsLen, ast_node_t *body)
+ * @brief Create a new AST function node
+ * @param name Function name
+ * @param args Function arguments
+ * @param argsLen Number of arguments
+ * @param body Function body
+ * @return A new AST function node
+ */
+ast_node_t *create_ast_function_node(char *name, ast_node_t **args, size_t argsLen, ast_node_t *body);
+
+/**
+ * @fn ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t argsLen)
+ * @brief Create a new AST function call node
+ * @param name Function name
+ * @param args Function arguments
+ * @param argsLen Number of arguments
+ * @return A new AST function call node
+ */
+ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t argsLen);
+
+/**
+ * @fn ast_node_t *create_ast_return_node(ast_node_t *value)
+ * @brief Create a new AST return node
+ * @param value Return value
+ * @return A new AST return node
+ */
+ast_node_t *create_ast_return_node(ast_node_t *value);
+
+/**
+ * @fn ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *increment, ast_node_t *body)
+ * @brief Create a new AST for node
+ * @param init Initialization
+ * @param condition Condition
+ * @param increment Increment
+ * @param body Body
+ * @return A new AST for node
+ */
+ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *increment, ast_node_t *body);
+
+/**
+ * @fn ast_node_t *create_ast_while_node(ast_node_t *condition, ast_node_t *body)
+ * @brief Create a new AST while node
+ * @param condition Condition
+ * @param body Body
+ * @return A new AST while node
+ */
+ast_node_t *create_ast_while_node(ast_node_t *condition, ast_node_t *body);
+
+/**
+ * @fn ast_node_t *create_ast_do_while_node(ast_node_t *condition, ast_node_t *body)
+ * @brief Create a new AST do while node
+ * @param condition Condition
+ * @param body Body
+ * @return A new AST do while node
+ */
+ast_node_t *create_ast_do_while_node(ast_node_t *condition, ast_node_t *body);
+
+/**
+ * @fn ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast_node_t *body)
+ * @brief Create a new AST foreach node
+ * @param variable Variable
+ * @param array Array
+ * @param body Body
+ * @return A new AST foreach node
+ */
+ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast_node_t *body);
+
+/**
+ * @fn ast_node_t *create_ast_if_node(ast_node_t *condition, ast_node_t *trueBranch, ast_node_t *falseBranch)
+ * @brief Create a new AST if node
+ * @param condition Condition
+ * @param trueBranch True branch
+ * @param falseBranch False branch
+ * @return A new AST if node
+ */
+ast_node_t *create_ast_if_node(ast_node_t *condition, ast_node_t *trueBranch, ast_node_t *falseBranch);
+
 
 /**
  * @fn void free_ast_node(ast_node_t *node)
