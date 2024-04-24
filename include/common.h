@@ -22,8 +22,7 @@
     #define DEBUG_PRINT(...) //!< Macro to print debug message
 #endif
 
-#define CHECK_ALLOC(ptr) if (!ptr) { ERROR("Memory allocation failed\n"); exit(EXIT_FAILURE); } //!< Macro to check memory allocation
-
-
+#define CHECK_ALLOC(ptr, message) if((ptr) == NULL) { fprintf(stderr, "CHECK_ALLOC: %s\n", (message)); exit(EXIT_FAILURE); } //!< Macro to check memory allocation
+#define ERROR(message) fprintf(stderr, "ERROR: %s\n", (message)); exit(EXIT_FAILURE) //!< Macro to print error message
 
 #endif // COMMON_H
