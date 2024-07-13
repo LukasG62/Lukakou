@@ -34,6 +34,9 @@ typedef enum {
     AST_NODE_FUNCTION_CALL, /*!< Function call node */
     AST_NODE_RETURN, /*!< Return node */
 
+    // DECLARATION
+    AST_NODE_DECLARATION, /*!< Declaration node */
+
     // Iteration
     AST_NODE_FOR, /*!< For node */
     AST_NODE_WHILE, /*!< While node */
@@ -78,8 +81,17 @@ typedef enum {
     OP_LT, /*!< Less than operator */
     OP_GTE, /*!< Greater than or equal operator */
     OP_LTE, /*!< Less than or equal operator */
-    OP_ASSIGN, /*!< Assign operator */
 } op_type_t;
+
+typedef enum {
+    TYPE_VOID,
+    TYPE_INT,
+    TYPE_FLOAT,
+    TYPE_STRING,
+    TYPE_BOOL,
+    TYPE_CHAR,
+    TYPE_ARRAY,
+} type_type_t;
 
 /**
  * @struct ast_node_block_t
@@ -102,6 +114,7 @@ typedef struct {
     struct __ast_node_t **args; /*!< List of arguments */
     size_t argsLen; /*!< Number of arguments */
     struct __ast_node_t *body; /*!< Function body */
+    type_type_t returnType; /*!< Return type */
 } ast_node_function_t;
 
 /**
@@ -123,6 +136,19 @@ typedef struct {
 typedef struct {
     struct __ast_node_t *value; /*!< Return value */
 } ast_node_return_t;
+
+/**
+ * @struct ast_node_declaration_t
+ * @brief Declaration node structure
+ * A declaration node is a node that contains the variable name, the type and the ast_node_t that represent the initialization of the variable.
+ * The initialization can be a constant, a variable, or a statement. It can also be NULL if the variable is not initialized.
+ * In this case the variable will be initialized to an 0 value (0 for int, 0.0 for float, etc).
+ */
+typedef struct {
+    char *name; /*!< Variable name */
+    type_type_t type; /*!< Variable type */
+    struct __ast_node_t *init; /*!< Initialization */
+} ast_node_declaration_t;
 
 /**
  * @struct ast_node_for_t
@@ -234,6 +260,7 @@ typedef struct __ast_node_t {
         ast_node_string_t string; /*!< String node */
         ast_node_constant_t constant; /*!< Constant node */
         ast_node_operator_t operator; /*!< Operator node */
+        ast_node_declaration_t declaration; /*!< Declaration node */
     } _udata;
 } ast_node_t;
 
@@ -382,6 +409,13 @@ ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast
  */
 ast_node_t *create_ast_if_node(ast_node_t *condition, ast_node_t *trueBranch, ast_node_t *falseBranch);
 
+/**
+ * @fn char is_leaf(ast_node_t *node)
+ * @brief check if the node is a leaf based on the node type
+ * @note a node is considered a leaf if it has a node type greater than AST_NODE_LEAVES
+ */
+char is_leaf(ast_node_t *node);
+
 
 /**
  * @fn void free_ast_node(ast_node_t *node)
@@ -444,7 +478,7 @@ void free_ast_stack(ast_stack_t *stack);
  * @param node AST node
  * @return void
  */
-void add_to_ast_stack(ast_stack_t **stack, ast_node_t *node);
+void push_ast_stack(ast_stack_t **stack, ast_node_t *node);
 
 /**
  * @fn ast_node_t *pop_ast_stack(ast_stack_t **stack)
