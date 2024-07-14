@@ -2,7 +2,7 @@
 # Programs to build
 PROG=lukac
 # Test programs to build
-TEST_PROG=test_lexer test_ast
+TEST_PROG=test_lexer test_ast test_linked_list
 # Path to bin directory
 BIN_DIR=bin
 # Programs path
@@ -43,7 +43,7 @@ docs:
 	@doxygen Doxyfile
 
 # Rule for building libcompiler.a
-$(LIB_DIR)/libcompiler.a: $(OBJ_DIR)/lexer.o $(OBJ_DIR)/parser.o $(OBJ_DIR)/ast.o
+$(LIB_DIR)/libcompiler.a: $(OBJ_DIR)/lexer.o $(OBJ_DIR)/parser.o $(OBJ_DIR)/ast.o $(OBJ_DIR)/linked_list.o
 	@mkdir -p $(LIB_DIR)
 	@echo "AR\t$@"
 	@ar rcs $@ $^
