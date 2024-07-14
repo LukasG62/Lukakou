@@ -84,6 +84,32 @@ int main(int argc, char *argv[]) {
 
     DEBUG_PRINT("Person at index 1: %s, %d\n", person->name, person->age);
 
+    // Test out of bounds
+    person = (person_t *) get_linked_list(person_list, 3);
+    if(person != NULL) {
+        ERROR("Failed to get out of bounds person from linked list");
+    }
+    DEBUG_PRINT("NULL person at index 3\n");
+
+    // Test iterator function
+    linked_list_node_t *node = NULL;
+    person = NULL; 
+    while((person = iter_linked_list(person_list, &node)) != NULL) {
+        if(person == NULL) {
+            ERROR("Failed to get person from linked list");
+        }
+        DEBUG_PRINT("Person: %s, %d\n", person->name, person->age);
+    }
+    DEBUG_PRINT("Test reverse iterator function\n");
+
+    person = NULL;
+    while((person = iter_linked_list_reverse(person_list, &node)) != NULL) {
+        if(person == NULL) {
+            ERROR("Failed to get person from linked list");
+        }
+        DEBUG_PRINT("Person: %s, %d\n", person->name, person->age);
+    }
+
     // Free the linked list
     free_linked_list(person_list, (fn_free_data_t) free_person);
 

@@ -54,7 +54,7 @@ char push_linked_list(linked_list_t *list, void *data) {
         list->tail->next = node;
         list->tail = node;
     }
-    
+
     list->size++;
     return TRUE;
 }
@@ -119,6 +119,53 @@ void *get_linked_list(linked_list_t *list, size_t index) {
 
     return node->data;
 }
+
+/**
+ * @fn void *iter_linked_list(linked_list_t *list, linked_list_node_t **node)
+ * @brief iterator for the linked list nodes
+ * When the node is NULL, the iterator starts from the head of the list otherwise it starts from the node
+ * and returns the next node in the list until the end of the list is reached
+ * When the end of the list is reached, NULL is returned
+ * @param list pointer to the linked list
+ * @param node adress of the pointer to the node in the list (this will be updated to the next node automatically)
+ * @return pointer to the next node in the list
+ * @warning the node mustn't be modified by the user otherwise it may cause unexpected behavior
+ * @note the node is updated to the next node in the list automatically and must be passed as an argument in the next call (same as the str_tok function)
+ */
+void *iter_linked_list(linked_list_t *list, linked_list_node_t **node) {
+    if(node == NULL) return NULL;
+
+    if (*node == NULL) 
+        *node = list->head;
+    else 
+        *node = (*node)->next;
+
+    if (*node == NULL) {
+        return NULL;
+    }
+
+    return (*node)->data;
+}
+/**
+ * @fn void *iter_linked_list_reverse(linked_list_t *list, linked_list_node_t **node)
+ * @brief iterator for the linked list nodes in reverse order 
+ * @see iter_linked_list
+ */
+void *iter_linked_list_reverse(linked_list_t *list, linked_list_node_t **node) {
+    if(node == NULL) return NULL;
+
+    if (*node == NULL) 
+        *node = list->tail;
+    else 
+        *node = (*node)->prev;
+
+    if (*node == NULL) {
+        return NULL;
+    }
+
+    return (*node)->data;
+}
+
 
 /**
  * @fn void free_linked_list(linked_list_t *list)
