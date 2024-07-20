@@ -358,7 +358,7 @@ char is_leaf(ast_node_t *node) {
  * @return void
  */
 char free_ast_node(ast_node_t *node) {
-    if(node == NULL) return;
+    if(node == NULL) return TRUE;
 
     // Recursively free the children nodes based on the node type
     switch(node->type) {
@@ -373,11 +373,9 @@ char free_ast_node(ast_node_t *node) {
         
         case AST_NODE_ARRAY:
             free_ast_node(node->_udata.array.arrayIndex);
-            //free(node->_udata.array.name); // name will be a pointer to the symbol table
             break;
         case AST_NODE_BLOCK:
             free_linked_list(node->_udata.block.nodes, (fn_free_data_t) free_ast_node);
-            free(node->_udata.block.nodes);
             break;
 
         case AST_NODE_FUNCTION:
@@ -387,7 +385,6 @@ char free_ast_node(ast_node_t *node) {
 
         case AST_NODE_FUNCTION_CALL:
             free_linked_list(node->_udata.functionCall.args, (fn_free_data_t) free_ast_node);
-            free(node->_udata.functionCall.args);
             break;
 
         case AST_NODE_IF:
@@ -424,8 +421,10 @@ char free_ast_node(ast_node_t *node) {
             break;
         
         default:
-            DEBUG_PRINT("Freeing node type %s is not implemented\n", str_ast_node_type(node->type));
-            UNIMPLEMENTED("free_ast_node");
+            if(node->type < AST_NODE_LEAVES) {
+                DEBUG_PRINT("Freeing node type %s is not implemented\n", str_ast_node_type(node->type));
+                UNIMPLEMENTED("free_ast_node");
+            }
     }
     free(node);
 
@@ -769,8 +768,10 @@ const char *get_edge_label(ast_node_t *parent, ast_node_t *child) {
         case AST_NODE_OPERATOR:
             if(parent->_udata.operator.left == child) return "left";
             return "right";
+
+        default:
+            return "";
     }
-    return "";
 }
 
 /**********************************************************************************************************************/
