@@ -25,10 +25,17 @@ typedef enum {
     TOKEN_OPERATOR, /*!< Operator token */
     TOKEN_SEPARATOR, /*!< Separator token */
     TOKEN_COMMENT, /*!< Comment token */
+    TOKEN_DATATYPE, /*!< Data type token */
+    TOKEN_SPECIAL_VARIABLE, /*!< Special variable token */
+    TOKEN_ARRAY_OPEN, /*!< Array open token */
+    TOKEN_ARRAY_CLOSE, /*!< Array close token */
 } token_type_t;
 
-#define LEXER_KEYWORDS "float int char void ifnt elif if else while for return foreach dowhile array string"
-#define LEXER_LOGICAL_OPERATORS "NOT OR AND"
+#define LEXER_DATATYPE "Float Integer Character Void Array Boolean String"
+#define LEXER_KEYWORDS "READ PRINT DECLARE VAR AS FUNCTION WITH BEGIN RETURN END IF THEN OTHERWISE IFNT FOR TO DO WHILE FOREACH IN CHECK VALUE WHEN CALL OF UNTIL INTO FROM REPEAT OTHERIF"
+#define LEXER_LOGICAL_OPERATORS "NOT OR AND XOR IS ISNT GREATER LESS == != >= <="
+#define LEXER_ARITHMETIC_OPERATORS "ADD SUB MUL DIV MOD POW ASSIGN + - * / % ^ ="
+#define LEXER_SPECIAL_VARIABLES "stdin stdout stderr TRUE FALSE"
 
 /**
  * @struct token_t
