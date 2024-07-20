@@ -8,6 +8,13 @@
 /*                                           Private functions signatures                                             */
 /**********************************************************************************************************************/
 
+/**
+ * @fn void push_ast_stack(linked_list_t *stack, ast_node_t *node)
+ * @brief Push a node to the AST stack
+ * This function is to avoid casting the node to void * when pushing it to the stack
+ */
+void push_ast_stack(linked_list_t *stack, ast_node_t *node);
+
 
 /**********************************************************************************************************************/
 /*                                           Public functions definitions                                             */
@@ -40,6 +47,11 @@ ast_node_t *create_ast_node(ast_node_type_t type) {
 ast_node_t *create_ast_operator_node(op_type_t type, ast_node_t *left, ast_node_t *right) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_OPERATOR);
+
+    // Add parent to the children nodes
+    if(left != NULL) left->parent = node;
+    if(right != NULL) right->parent = node;
+
     // Initialize the node
     node->_udata.operator.type = type;
     node->_udata.operator.left = left;
@@ -57,6 +69,7 @@ ast_node_t *create_ast_operator_node(op_type_t type, ast_node_t *left, ast_node_
 ast_node_t *create_ast_variable_node(char *name) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_VARIABLE);
+
     // Initialize the node
     node->_udata.variable.name = name;
     node->data = &node->_udata.variable;
@@ -73,6 +86,10 @@ ast_node_t *create_ast_variable_node(char *name) {
 ast_node_t *create_ast_array_node(char *name, ast_node_t *index) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_ARRAY);
+
+    // Add parent to the children nodes
+    if(index != NULL) index->parent = node;
+
     // Initialize the node
     node->_udata.array.name = name;
     node->_udata.array.arrayIndex = index;
@@ -95,17 +112,17 @@ ast_node_t *create_ast_string_node(char *value) {
     return node;
 }
 /**
- * @fn ast_node_t *create_ast_constant_node(char *value)
- * @brief Create a new AST constant node
- * @param value Constant value
- * @return A new AST constant node
+ * @fn ast_node_t *create_ast_literal_node(char *value)
+ * @brief Create a new AST literal node
+ * @param value Literal value
+ * @return A new AST literal node
  */
-ast_node_t *create_ast_constant_node(char *value) {
+ast_node_t *create_ast_literal_node(char *value) {
     // Create a new node
-    ast_node_t *node = create_ast_node(AST_NODE_CONSTANT);
+    ast_node_t *node = create_ast_node(AST_NODE_LITERAL);
     // Initialize the node
-    node->_udata.constant.value = value;
-    node->data = &node->_udata.constant;
+    node->_udata.literal.value = value;
+    node->data = &node->_udata.literal;
     return node;
 }
 /**
@@ -113,12 +130,11 @@ ast_node_t *create_ast_constant_node(char *value) {
  * @brief Create a new AST block node
  * @return A new AST block node
  */
-ast_node_t *create_ast_block_node(ast_node_t **nodes, size_t nodesLen) {
+ast_node_t *create_ast_block_node() {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_BLOCK);
     // Initialize the node
-    node->_udata.block.nodes = nodes;
-    node->_udata.block.nodesLen = nodesLen;
+    node->_udata.block.nodes = create_linked_list();
     node->data = &node->_udata.block;
     return node;
 }
@@ -132,14 +148,17 @@ ast_node_t *create_ast_block_node(ast_node_t **nodes, size_t nodesLen) {
  * @param body Function body
  * @return A new AST function node
  */
-ast_node_t *create_ast_function_node(char *name, ast_node_t **args, size_t argsLen, ast_node_t *body) {
+ast_node_t *create_ast_function_node(char *name, type_type_t type, ast_node_t *body) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_FUNCTION);
+    // Add parent to the children nodes
+    if(body != NULL) body->parent = node;
+
     // Initialize the node
     node->_udata.function.name = name;
-    node->_udata.function.args = args;
-    node->_udata.function.argsLen = argsLen;
+    node->_udata.function.args = create_linked_list();
     node->_udata.function.body = body;
+    node->data = &node->_udata.function;
     return node;
 }
 
@@ -151,13 +170,12 @@ ast_node_t *create_ast_function_node(char *name, ast_node_t **args, size_t argsL
  * @param argsLen Number of arguments
  * @return A new AST function call node
  */
-ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t argsLen) {
+ast_node_t *create_ast_function_call_node(char *name) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_FUNCTION_CALL);
     // Initialize the node
     node->_udata.functionCall.name = name;
-    node->_udata.functionCall.args = args;
-    node->_udata.functionCall.argsLen = argsLen;
+    node->_udata.functionCall.args = create_linked_list();
     node->data = &node->_udata.functionCall;
     return node;
 }
@@ -171,27 +189,37 @@ ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t 
 ast_node_t *create_ast_return_node(ast_node_t *value) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_RETURN);
+    // Add parent to the children nodes
+    if(value != NULL) value->parent = node;
+
     // Initialize the node
     node->_udata.returnNode.value = value;
     node->data = &node->_udata.returnNode;
     return node;
 }
 /**
- * @fn ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *increment, ast_node_t *body)
+ * @fn ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *step, ast_node_t *body)
  * @brief Create a new AST for node
  * @param init Initialization
  * @param condition Condition
- * @param increment Increment
+ * @param step Step
  * @param body Body
  * @return A new AST for node
  */
-ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *increment, ast_node_t *body) {
+ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *step, ast_node_t *body) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_FOR);
+
+    // Add parent to the children nodes
+    if(init != NULL) init->parent = node;
+    if(condition != NULL) condition->parent = node;
+    if(step != NULL) step->parent = node;
+    if(body != NULL) body->parent = node;
+
     // Initialize the node
     node->_udata.forNode.init = init;
     node->_udata.forNode.condition = condition;
-    node->_udata.forNode.increment = increment;
+    node->_udata.forNode.step = step;
     node->_udata.forNode.body = body;
     node->data = &node->_udata.forNode;
     return node;
@@ -206,6 +234,11 @@ ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_nod
 ast_node_t *create_ast_while_node(ast_node_t *condition, ast_node_t *body) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_WHILE);
+    
+    // Add parent to the children nodes
+    if(condition != NULL) condition->parent = node;
+    if(body != NULL) body->parent = node;
+
     // Initialize the node
     node->_udata.whileNode.condition = condition;
     node->_udata.whileNode.body = body;
@@ -220,13 +253,18 @@ ast_node_t *create_ast_while_node(ast_node_t *condition, ast_node_t *body) {
  * @param body Body
  * @return A new AST do while node
  */
-ast_node_t *create_ast_do_while_node(ast_node_t *condition, ast_node_t *body) {
+ast_node_t *create_ast_repeat_until_node(ast_node_t *condition, ast_node_t *body) {
     // Create a new node
-    ast_node_t *node = create_ast_node(AST_NODE_DO_WHILE);
+    ast_node_t *node = create_ast_node(AST_NODE_REPEAT_UNTIL);
+
+    // Add parent to the children nodes
+    if(condition != NULL) condition->parent = node;
+    if(body != NULL) body->parent = node;
+
     // Initialize the node
-    node->_udata.doWhileNode.condition = condition;
-    node->_udata.doWhileNode.body = body;
-    node->data = &node->_udata.doWhileNode;
+    node->_udata.repeatUntilNode.condition = condition;
+    node->_udata.repeatUntilNode.body = body;
+    node->data = &node->_udata.repeatUntilNode;
     return node;
 }
 
@@ -241,6 +279,11 @@ ast_node_t *create_ast_do_while_node(ast_node_t *condition, ast_node_t *body) {
 ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast_node_t *body) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_FOREACH);
+
+    // Add parent to the children nodes
+    if(variable != NULL) variable->parent = node;
+    if(array != NULL) array->parent = node;
+
     // Initialize the node
     node->_udata.foreachNode.variable = variable;
     node->_udata.foreachNode.array = array;
@@ -260,11 +303,41 @@ ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast
 ast_node_t *create_ast_if_node(ast_node_t *condition, ast_node_t *trueBranch, ast_node_t *falseBranch) {
     // Create a new node
     ast_node_t *node = create_ast_node(AST_NODE_IF);
+
+    // Add parent to the children nodes
+    if(condition != NULL) condition->parent = node;
+    if(trueBranch != NULL) trueBranch->parent = node;
+    if(falseBranch != NULL) falseBranch->parent = node;
+
+
     // Initialize the node
     node->_udata.ifNode.condition = condition;
     node->_udata.ifNode.trueBranch = trueBranch;
     node->_udata.ifNode.falseBranch = falseBranch;
     node->data = &node->_udata.ifNode;
+    return node;
+}
+
+/**
+ * @fn ast_node_t *create_ast_var_declaration_node(char *name, type_type_t type, ast_node_t *init)
+ * @brief Create a new AST declaration node
+ * @param name Variable name
+ * @param type Variable type
+ * @param init Initialization
+ * @return A new AST declaration node
+ */
+ast_node_t *create_ast_var_declaration_node(char *name, type_type_t type, ast_node_t *init) {
+    // Create a new node
+    ast_node_t *node = create_ast_node(AST_NODE_VAR_DECLARATION);
+
+    // Add parent to the children nodes
+    if(init != NULL) init->parent = node;
+
+    // Initialize the node
+    node->_udata.varDeclarationNode.name = name;
+    node->_udata.varDeclarationNode.type = type;
+    node->_udata.varDeclarationNode.init = init;
+    node->data = &node->_udata.varDeclarationNode;
     return node;
 }
 
@@ -284,7 +357,7 @@ char is_leaf(ast_node_t *node) {
  * @param node AST node
  * @return void
  */
-void free_ast_node(ast_node_t *node) {
+char free_ast_node(ast_node_t *node) {
     if(node == NULL) return;
 
     // Recursively free the children nodes based on the node type
@@ -293,29 +366,27 @@ void free_ast_node(ast_node_t *node) {
             free_ast_node(node->_udata.operator.left);
             free_ast_node(node->_udata.operator.right);
             break;
+
+        case AST_NODE_VAR_DECLARATION:
+            free_ast_node(node->_udata.varDeclarationNode.init);
+            break;
+        
         case AST_NODE_ARRAY:
             free_ast_node(node->_udata.array.arrayIndex);
             //free(node->_udata.array.name); // name will be a pointer to the symbol table
             break;
         case AST_NODE_BLOCK:
-            for(size_t i = 0; i < node->_udata.block.nodesLen; i++) {
-                free_ast_node(node->_udata.block.nodes[i]);
-            }
+            free_linked_list(node->_udata.block.nodes, (fn_free_data_t) free_ast_node);
             free(node->_udata.block.nodes);
             break;
 
         case AST_NODE_FUNCTION:
-            for(size_t i = 0; i < node->_udata.function.argsLen; i++) {
-                free_ast_node(node->_udata.function.args[i]);
-            }
-            free(node->_udata.function.args);
+            free_linked_list(node->_udata.function.args, (fn_free_data_t) free_ast_node);
             free_ast_node(node->_udata.function.body);
             break;
 
         case AST_NODE_FUNCTION_CALL:
-            for(size_t i = 0; i < node->_udata.functionCall.argsLen; i++) {
-                free_ast_node(node->_udata.functionCall.args[i]);
-            }
+            free_linked_list(node->_udata.functionCall.args, (fn_free_data_t) free_ast_node);
             free(node->_udata.functionCall.args);
             break;
 
@@ -328,7 +399,7 @@ void free_ast_node(ast_node_t *node) {
         case AST_NODE_FOR:
             free_ast_node(node->_udata.forNode.init);
             free_ast_node(node->_udata.forNode.condition);
-            free_ast_node(node->_udata.forNode.increment);
+            free_ast_node(node->_udata.forNode.step);
             free_ast_node(node->_udata.forNode.body);
             break;
         
@@ -337,9 +408,9 @@ void free_ast_node(ast_node_t *node) {
             free_ast_node(node->_udata.whileNode.body);
             break;
         
-        case AST_NODE_DO_WHILE:
-            free_ast_node(node->_udata.doWhileNode.condition);
-            free_ast_node(node->_udata.doWhileNode.body);
+        case AST_NODE_REPEAT_UNTIL:
+            free_ast_node(node->_udata.repeatUntilNode.condition);
+            free_ast_node(node->_udata.repeatUntilNode.body);
             break;
         
         case AST_NODE_FOREACH:
@@ -353,11 +424,12 @@ void free_ast_node(ast_node_t *node) {
             break;
         
         default:
-            char message[100];
-            sprintf(message, "free_ast_node: node type %s not implemented", str_ast_node_type(node->type));
-            UNIMPLEMENTED(message);
+            DEBUG_PRINT("Freeing node type %s is not implemented\n", str_ast_node_type(node->type));
+            UNIMPLEMENTED("free_ast_node");
     }
     free(node);
+
+    return TRUE;
 }
 
 /**
@@ -372,16 +444,17 @@ const char *str_ast_node_type(ast_node_type_t type) {
         case AST_NODE_VARIABLE: return "VARIABLE";
         case AST_NODE_ARRAY: return "ARRAY";
         case AST_NODE_STRING: return "STRING";
-        case AST_NODE_CONSTANT: return "CONSTANT";
+        case AST_NODE_LITERAL: return "LITERAL";
         case AST_NODE_BLOCK: return "BLOCK";
-        case AST_NODE_FUNCTION: return "FUNCTION";
+        case AST_NODE_FUNCTION: return "FUNCTION DEFINITION";
         case AST_NODE_FUNCTION_CALL: return "FUNCTION CALL";
         case AST_NODE_RETURN: return "RETURN";
         case AST_NODE_FOR: return "FOR";
         case AST_NODE_WHILE: return "WHILE";
-        case AST_NODE_DO_WHILE: return "DO WHILE";
+        case AST_NODE_REPEAT_UNTIL: return "REPEAT UNTIL";
         case AST_NODE_FOREACH: return "FOREACH";
         case AST_NODE_IF: return "IF";
+        case AST_NODE_VAR_DECLARATION: return "VARIABLE DECLARATION";
         default: return "UKNOWN";
     }
 }
@@ -408,6 +481,7 @@ const char *str_op_type(op_type_t type) {
         case OP_AND: return "AND";
         case OP_OR: return "OR";
         case OP_NOT: return "NOT";
+        case OP_ASSIGN: return "ASSIGN";
         default: return "UNKNOWN";
     }
 
@@ -421,18 +495,31 @@ const char *str_op_type(op_type_t type) {
 */
 void append_ast_node(ast_node_t *parent, ast_node_t *child) {
     child->parent = parent;
+    linked_list_t *list = NULL;
     // Check if the parent is a block node
-    if(parent->type == AST_NODE_BLOCK) {
-        // Resize the nodes array and append the child node
-        ast_node_block_t *block = (ast_node_block_t *)parent->data;
-        block->nodes = (ast_node_t **)realloc(block->nodes, sizeof(ast_node_t *) * (block->nodesLen + 1));
-        CHECK_ALLOC(block->nodes, "append_ast_node: block->nodes");
-        block->nodes[block->nodesLen++] = child;
-        return;
+    switch (parent->type)
+    {
+        case AST_NODE_BLOCK:
+            ast_node_block_t *block = (ast_node_block_t *)parent->data;
+            list = block->nodes;
+            break;
+        case AST_NODE_FUNCTION:
+            ast_node_function_t *function = (ast_node_function_t *)parent->data;
+            list = function->args;
+            break;
+        case AST_NODE_FUNCTION_CALL:
+            ast_node_function_call_t *functionCall = (ast_node_function_call_t *)parent->data;
+            list = functionCall->args;
+            break;
+        default:
+            ERROR("Cannot append a child node to a non block node");
+            break;
     }
-    // Can't append a child to a non block node
+    if(list != NULL) {
+        push_linked_list(list, child);
+    }
     else {
-        ERROR("append_ast_node: parent node is not a block node");
+        ERROR("append_ast_node: list is NULL");
     }
 }
 
@@ -449,14 +536,15 @@ void append_ast_node(ast_node_t *parent, ast_node_t *child) {
  * if so, the stack is freed and set to NULL automatically.
  * @warning the stack must not be modified by external functions or the behavior is undefined.
  */
-ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack) {
-    if(stack == NULL) ERROR("next_ast_node: stack is NULL");
-    if(*stack == NULL) push_ast_stack(stack, node); // push the root node to the stack
+ast_node_t *next_ast_node(ast_iterator_t *iter) {
+    linked_list_t *stack = iter->stack;
+    ast_node_t *current = iter_linked_list(stack, &iter->current);
 
-    ast_node_t *current = pop_ast_stack(stack);
+    // Variables to iterate over the linked list present in the children nodes
+    linked_list_node_t *node = NULL;
+    ast_node_t *child = NULL;
+
     if(current == NULL) {
-        free_ast_stack(*stack);
-        *stack = NULL;
         return NULL;
     }
 
@@ -464,8 +552,8 @@ ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack) {
     switch(current->type) {
         case AST_NODE_OPERATOR:
             ast_node_operator_t op = *(ast_node_operator_t *)current->data;
-            if(op.right != NULL) push_ast_stack(stack, current->_udata.operator.right);
             if(op.left != NULL) push_ast_stack(stack, current->_udata.operator.left);
+            if(op.right != NULL) push_ast_stack(stack, current->_udata.operator.right);
             break;
 
         case AST_NODE_ARRAY:
@@ -475,52 +563,49 @@ ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack) {
 
         case AST_NODE_BLOCK:
             ast_node_block_t block = *(ast_node_block_t *)current->data;
-            for(size_t i = block.nodesLen; i > 0; i--) {
-                push_ast_stack(stack, block.nodes[i - 1]);
+            while((child = iter_linked_list(block.nodes, &node))) {
+                push_ast_stack(stack, child);
             }
             break;
         
         case AST_NODE_FUNCTION:
             ast_node_function_t function = *(ast_node_function_t *)current->data;
             if(function.body != NULL) push_ast_stack(stack, current->_udata.function.body);
-            for(size_t i = function.argsLen; i > 0; i--) {
-                push_ast_stack(stack, function.args[i - 1]);
-            }
             break;
         
-        case AST_NODE_DO_WHILE:
-            ast_node_do_while_t doWhile = *(ast_node_do_while_t *)current->data;
-            if(doWhile.body != NULL) push_ast_stack(stack, current->_udata.doWhileNode.body);
-            if(doWhile.condition != NULL) push_ast_stack(stack, current->_udata.doWhileNode.condition);
+        case AST_NODE_REPEAT_UNTIL:
+            ast_node_repeat_until_t repeatUntil = *(ast_node_repeat_until_t *)current->data;
+            if(repeatUntil.condition != NULL) push_ast_stack(stack, current->_udata.repeatUntilNode.condition);
+            if(repeatUntil.body != NULL) push_ast_stack(stack, current->_udata.repeatUntilNode.body);
             break;
         
         case AST_NODE_FOR:
             ast_node_for_t forNode = *(ast_node_for_t *)current->data;
-            if(forNode.body != NULL) push_ast_stack(stack, current->_udata.forNode.body);
-            if(forNode.increment != NULL) push_ast_stack(stack, current->_udata.forNode.increment);
-            if(forNode.condition != NULL) push_ast_stack(stack, current->_udata.forNode.condition);
             if(forNode.init != NULL) push_ast_stack(stack, current->_udata.forNode.init);
+            if(forNode.condition != NULL) push_ast_stack(stack, current->_udata.forNode.condition);
+            if(forNode.step != NULL) push_ast_stack(stack, current->_udata.forNode.step);
+            if(forNode.body != NULL) push_ast_stack(stack, current->_udata.forNode.body);
             break;
         
         case AST_NODE_FOREACH:
             ast_node_foreach_t foreach = *(ast_node_foreach_t *)current->data;
-            if(foreach.body != NULL) push_ast_stack(stack, current->_udata.foreachNode.body);
-            if(foreach.array != NULL) push_ast_stack(stack, current->_udata.foreachNode.array);
             if(foreach.variable != NULL) push_ast_stack(stack, current->_udata.foreachNode.variable);
+            if(foreach.array != NULL) push_ast_stack(stack, current->_udata.foreachNode.array);
+            if(foreach.body != NULL) push_ast_stack(stack, current->_udata.foreachNode.body);
             break;
         
         case AST_NODE_FUNCTION_CALL:
             ast_node_function_call_t functionCall = *(ast_node_function_call_t *)current->data;
-            for(size_t i = functionCall.argsLen; i > 0; i--) {
-                push_ast_stack(stack, functionCall.args[i - 1]);
+            while((child = iter_linked_list(functionCall.args, &node))) {
+                push_ast_stack(stack, child);
             }
             break;
 
         case AST_NODE_IF:
             ast_node_if_t ifNode = *(ast_node_if_t *)current->data;
-            if(ifNode.falseBranch != NULL) push_ast_stack(stack, current->_udata.ifNode.falseBranch);
-            if(ifNode.trueBranch != NULL) push_ast_stack(stack, current->_udata.ifNode.trueBranch);
             if(ifNode.condition != NULL) push_ast_stack(stack, current->_udata.ifNode.condition);
+            if(ifNode.trueBranch != NULL) push_ast_stack(stack, current->_udata.ifNode.trueBranch);
+            if(ifNode.falseBranch != NULL) push_ast_stack(stack, current->_udata.ifNode.falseBranch);
             break;
         
         case AST_NODE_RETURN:
@@ -530,13 +615,13 @@ ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack) {
 
         case AST_NODE_WHILE:
             ast_node_while_t whileNode = *(ast_node_while_t *)current->data;
-            if(whileNode.body != NULL) push_ast_stack(stack, current->_udata.whileNode.body);
             if(whileNode.condition != NULL) push_ast_stack(stack, current->_udata.whileNode.condition);
+            if(whileNode.body != NULL) push_ast_stack(stack, current->_udata.whileNode.body);
             break;
         
-        case AST_NODE_DECLARATION:
-            ast_node_declaration_t declaration = *(ast_node_declaration_t *)current->data;
-            if(declaration.init != NULL) push_ast_stack(stack, current->_udata.declaration.init);
+        case AST_NODE_VAR_DECLARATION:
+            ast_node_var_declaration_t declaration = *(ast_node_var_declaration_t *)current->data;
+            if(declaration.init != NULL) push_ast_stack(stack, current->_udata.varDeclarationNode.init);
             break;
         
         // Should be a leaf node
@@ -548,62 +633,6 @@ ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack) {
     return current;
 }
 
-/**
- * @fn void free_ast_stack(ast_stack_t *stack)
- * @brief Free an AST stack
- * @param stack AST stack
- * @return void
- */
-void free_ast_stack(ast_stack_t *stack) {
-    if(stack != NULL) {
-        free_ast_stack(stack->next);
-        free(stack);
-        stack = NULL;
-    }
-}
-
-/**
- * @fn add_to_ast_stack(ast_stack_t **stack, ast_node_t *node)
- * @brief Add a node to the AST stack
- * @param stack AST stack
- * @param node AST node
- * @return void
- */
-void push_ast_stack(ast_stack_t **stack, ast_node_t *node) {
-    if(stack == NULL) {
-        ERROR("add_to_ast_stack: stack is NULL");
-    }
-
-    if(*stack == NULL) {
-        *stack = (ast_stack_t *)malloc(sizeof(ast_stack_t));
-        CHECK_ALLOC(*stack, "add_to_ast_stack: stack");
-        (*stack)->node = node;
-        (*stack)->next = NULL;
-    }
-    else {
-        push_ast_stack(&(*stack)->next, node);
-    }
-}
-
-/**
- * @fn ast_node_t *pop_ast_stack(ast_stack_t **stack)
- * @brief Pop a node from the AST stack
- * @param stack AST stack
- * @return The popped node
- */
-ast_node_t *pop_ast_stack(ast_stack_t **stack) {
-    if(stack == NULL) {
-        ERROR("pop_ast_stack: stack is NULL");
-    }
-
-    if(*stack == NULL) return NULL;
-
-    ast_stack_t *current = *stack;
-    *stack = current->next;
-    ast_node_t *node = current->node;
-    free(current);
-    return node;
-}
 
 /**
  * @fn gviz_ast_node(ast_node_t *node, FILE *file)
@@ -615,19 +644,144 @@ ast_node_t *pop_ast_stack(ast_stack_t **stack) {
 void gviz_ast_node(ast_node_t *node, FILE *file) {
     if(node == NULL) return;
 
-    ast_stack_t *stack = NULL;
+    ast_iterator_t *iter = create_ast_iterator(node);
+
     fprintf(file, GVIZ_FILE_HEADER);
     // Go through the AST tree and generate the Graphviz file
     ast_node_t *current = NULL;
-    while((current = next_ast_node(node, &stack))) {
-        GVIZ_ADD_NODE(file, current, is_leaf(current) ? GVIZ_LEAF_NODE_STYLE : GVIZ_INTERNAL_NODE_STYLE);
-        if(current->parent != NULL) {
-            GVIZ_ADD_EDGE(file, current->parent, current);
+    while((current = next_ast_node(iter))) {
+        ast_node_t *parent = current->parent;
+        char label[100];
+        if(is_leaf(current)) {
+            switch(current->type) {
+                case AST_NODE_VARIABLE:
+                    sprintf(label, "%s [%s]", str_ast_node_type(current->type), current->_udata.variable.name);
+                    break;
+                case AST_NODE_STRING:
+                    sprintf(label, "%s ['%s']", str_ast_node_type(current->type), current->_udata.string.value);
+                    break;
+                case AST_NODE_LITERAL:
+                    sprintf(label, "%s [%s]", str_ast_node_type(current->type), current->_udata.literal.value);
+                    break;
+                case AST_NODE_ARRAY:
+                    sprintf(label, "%s [%s]", str_ast_node_type(current->type), current->_udata.array.name);
+                    break;
+                default:
+                    sprintf(label, "%s", str_ast_node_type(current->type));
+                    break;
+            }
+        } else {
+            if(current->type == AST_NODE_OPERATOR) {
+                sprintf(label, "%s [%s]", str_ast_node_type(current->type), str_op_type(current->_udata.operator.type));
+            } else
+            sprintf(label, "%s", str_ast_node_type(current->type));
+        }
+        GVIZ_ADD_NODE(file, current, is_leaf(current) ? GVIZ_LEAF_NODE_STYLE : GVIZ_INTERNAL_NODE_STYLE, label);
+        if(parent != NULL) {
+            GVIZ_ADD_EDGE_TEXT(file, current->parent, current, get_edge_label(parent, current));
         }
     }
     fprintf(file, GVIZ_FILE_FOOTER);
+    free_ast_iterator(iter);
+}
+
+/**
+ * @fn ast_iterator_t *create_ast_iterator(ast_node_t *root)
+ * @brief Create a new AST iterator
+ * @param root Root node
+ * @return A new AST iterator
+ * @note The iterator is initialized to the first node of the tree
+ */
+ast_iterator_t *create_ast_iterator(ast_node_t *root) {
+    ast_iterator_t *iter = (ast_iterator_t *)malloc(sizeof(ast_iterator_t));
+    CHECK_ALLOC(iter, "create_ast_iterator: iter");
+    iter->stack = create_linked_list();
+    push_ast_stack(iter->stack, root);
+    iter->current = NULL;
+    return iter;
+}
+
+/**
+ * @fn void free_ast_iterator(ast_iterator_t *iter)
+ * @brief Free an AST iterator
+ * @param iter AST iterator
+ * @return void
+ */
+void free_ast_iterator(ast_iterator_t *iter) {
+    free_linked_list(iter->stack, NULL);
+    free(iter);
+}
+
+/**
+ * @char *get_edge_label(ast_node_t *parent, ast_node_t *child)
+ * @brief Get the label of the edge between two nodes
+ * @param parent Parent node
+ * @param child Child node
+ * @return The label of the edge
+ * @warning the label is allocated on the heap and must be freed by the user
+ */
+const char *get_edge_label(ast_node_t *parent, ast_node_t *child) {
+    switch(parent->type) {
+        case AST_NODE_BLOCK:
+            return ""; // no label for block nodes edges
+        case AST_NODE_FUNCTION:
+            if(parent->_udata.function.body == child) return "body";
+            return ""; // no label for function nodes edges
+
+        case AST_NODE_FUNCTION_CALL:
+            return ""; // no label for function call nodes edgess
+
+        case AST_NODE_RETURN:
+            return ""; // no label for return nodes edges
+
+        case AST_NODE_VAR_DECLARATION:
+            if(parent->_udata.varDeclarationNode.init == child) {
+                return "init";
+            }
+            return ""; // no label for variable declaration nodes edges
+
+        case AST_NODE_FUNCTION_DECLARATION:
+            return ""; // no label for function declaration nodes edges
+
+        case AST_NODE_FOR:
+            if(parent->_udata.forNode.init == child) return "init";
+            if(parent->_udata.forNode.condition == child) return "condition";
+            if(parent->_udata.forNode.step == child) return "step";
+            return "body";
+
+        case AST_NODE_WHILE:
+            if(parent->_udata.whileNode.condition == child) return "condition";
+            return "body";
+        case AST_NODE_REPEAT_UNTIL:
+            if(parent->_udata.repeatUntilNode.condition == child) return "condition";
+            return "body";
+        case AST_NODE_FOREACH:
+            if(parent->_udata.foreachNode.variable == child) return "variable";
+            if(parent->_udata.foreachNode.array == child) return "array";
+            return "body";
+        
+        case AST_NODE_IFNT:
+        case AST_NODE_IF:
+            if(parent->_udata.ifNode.condition == child) return "condition";
+            if(parent->_udata.ifNode.trueBranch == child) return "true-branch";
+            return "false-branch";
+
+        case AST_NODE_OPERATOR:
+            if(parent->_udata.operator.left == child) return "left";
+            return "right";
+    }
+    return "";
 }
 
 /**********************************************************************************************************************/
 /*                                           Private functions definitions                                            */
 /**********************************************************************************************************************/
+
+/**
+ * @fn void push_ast_stack(linked_list_t *stack, ast_node_t *node)
+ * @brief Push a node to the AST stack
+ * This function is to avoid casting the node to void * when pushing it to the stack
+ */
+void push_ast_stack(linked_list_t *stack, ast_node_t *node) {
+    push_linked_list(stack, (void *)node);
+}

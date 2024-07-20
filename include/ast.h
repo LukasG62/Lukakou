@@ -8,6 +8,7 @@
 #define AST_H
 
 #include "common.h"
+#include "linked_list.h"
 
 // Graphviz constants
 
@@ -19,7 +20,7 @@
 // Using the memory address of the node as the node name to get unique node names
 #define GVIZ_ADD_EDGE(file, from, to) fprintf(file, "\"%p\" -> \"%p\" [%s];\n", from, to, GVIZ_EDGE_STYLE)
 #define GVIZ_ADD_EDGE_TEXT(file, from, to, text) fprintf(file, "\"%p\" -> \"%p\" [%s, label=\"%s\"];\n", from, to, GVIZ_EDGE_STYLE, text)
-#define GVIZ_ADD_NODE(file, node, style) fprintf(file, "\"%p\" [%s];\n", node, style)
+#define GVIZ_ADD_NODE(file, node, style, label) fprintf(file, "\"%p\" [%s, label=\"%s\"];\n", node, style, label)
 #define GVIZ_ADD_NODE_TEXT(file, node, style, text) fprintf(file, "\"%p\" [%s, label=\"%s\"];\n", node, style, text)
 
 /**
@@ -35,29 +36,28 @@ typedef enum {
     AST_NODE_RETURN, /*!< Return node */
 
     // DECLARATION
-    AST_NODE_DECLARATION, /*!< Declaration node */
+    AST_NODE_VAR_DECLARATION, /*!< Declaration node */
+    AST_NODE_FUNCTION_DECLARATION, /*!< Declaration node */
 
     // Iteration
     AST_NODE_FOR, /*!< For node */
     AST_NODE_WHILE, /*!< While node */
-    AST_NODE_DO_WHILE, /*!< Do while node */
+    AST_NODE_REPEAT_UNTIL, /*!< Repeat until node */
     AST_NODE_FOREACH, /*!< Foreach node */
 
-    // Conditional (for now only if because i don't think we need else or elif (part of if node)
+    // Conditional (for now only if because i don't think we need else or elif (part of if node))
     AST_NODE_IF, /*!< If node */
     AST_NODE_IFNT, /*!< If not node */
 
-    // Misc (idk how to implement them yet)
-    AST_NODE_SYSTEM_INTERFACES, /*!< System interfaces node (System.io, System.syscall, etc) */
-    AST_NODE_SYSTEM_SUBINTERFACE,
+    // Operators
+    AST_NODE_OPERATOR, /*!< Operator node */
 
     // Variables (leaves of the tree)
     AST_NODE_LEAVES, /*!< Leaves of the tree */
     AST_NODE_VARIABLE, /*!< Variable node */
     AST_NODE_ARRAY, /*!< Array node */
     AST_NODE_STRING, /*!< String node */
-    AST_NODE_CONSTANT, /*!< Constant node */
-    AST_NODE_OPERATOR, /*!< Operator node */
+    AST_NODE_LITERAL, /*!< Constant node */
 
 } ast_node_type_t;
 
@@ -81,6 +81,7 @@ typedef enum {
     OP_LT, /*!< Less than operator */
     OP_GTE, /*!< Greater than or equal operator */
     OP_LTE, /*!< Less than or equal operator */
+    OP_ASSIGN, /*!< Assign operator */
 } op_type_t;
 
 typedef enum {
@@ -100,8 +101,7 @@ typedef enum {
  * The block node is the root node of the AST.
  */
 typedef struct {
-    struct __ast_node_t **nodes; /*!< List of nodes */
-    size_t nodesLen; /*!< Number of nodes */
+    linked_list_t *nodes; /*!< List of nodes */
 } ast_node_block_t;
 
 /**
@@ -111,7 +111,7 @@ typedef struct {
  */
 typedef struct {
     char *name; /*!< Function name */
-    struct __ast_node_t **args; /*!< List of arguments */
+    linked_list_t *args; /*!< List of arguments */
     size_t argsLen; /*!< Number of arguments */
     struct __ast_node_t *body; /*!< Function body */
     type_type_t returnType; /*!< Return type */
@@ -124,8 +124,7 @@ typedef struct {
  */
 typedef struct {
     char *name; /*!< Function name */
-    struct __ast_node_t **args; /*!< List of arguments */
-    size_t argsLen; /*!< Number of arguments */
+    linked_list_t *args; /*!< List of arguments */
 } ast_node_function_call_t;
 
 /**
@@ -138,9 +137,9 @@ typedef struct {
 } ast_node_return_t;
 
 /**
- * @struct ast_node_declaration_t
- * @brief Declaration node structure
- * A declaration node is a node that contains the variable name, the type and the ast_node_t that represent the initialization of the variable.
+ * @struct create_ast_var_declaration_node
+ * @brief Variable declaration node structure
+ * A variable declaration node is a node that contains the variable name, the type and the ast_node_t that represent the initialization of the variable.
  * The initialization can be a constant, a variable, or a statement. It can also be NULL if the variable is not initialized.
  * In this case the variable will be initialized to an 0 value (0 for int, 0.0 for float, etc).
  */
@@ -148,17 +147,17 @@ typedef struct {
     char *name; /*!< Variable name */
     type_type_t type; /*!< Variable type */
     struct __ast_node_t *init; /*!< Initialization */
-} ast_node_declaration_t;
+} ast_node_var_declaration_t;
 
 /**
  * @struct ast_node_for_t
  * @brief For node structure
- * A for node is a node that contains the initialization, the condition, the increment and the body.
+ * A for node is a node that contains the initialization, the condition, the step and the body.
  */
 typedef struct {
     struct __ast_node_t *init; /*!< Initialization */
     struct __ast_node_t *condition; /*!< Condition */
-    struct __ast_node_t *increment; /*!< Increment */
+    struct __ast_node_t *step; /*!< Step */
     struct __ast_node_t *body; /*!< Body */
 } ast_node_for_t;
 
@@ -177,7 +176,7 @@ typedef struct {
  * @brief Do while node structure
  * A do while node is a node that contains the condition and the body.
  */
-typedef ast_node_while_t ast_node_do_while_t; // dowhile is the same as while
+typedef ast_node_while_t ast_node_repeat_until_t;
 
 /**
  * @struct ast_node_foreach_t
@@ -221,10 +220,10 @@ typedef struct {
 } ast_node_array_t;
 
 typedef struct {
-    char *value; /*!< Constant value */
-} ast_node_constant_t; /*!< Constant node is the same as variable node */
+    char *value; /*!< literal value */
+} ast_node_literal_t;
 
-typedef ast_node_constant_t ast_node_string_t; /*!< String node is the same as constant node */
+typedef ast_node_literal_t ast_node_string_t;
 
 /**
  * @struct ast_node_operator_t
@@ -252,26 +251,27 @@ typedef struct __ast_node_t {
         ast_node_return_t returnNode; /*!< Return node */
         ast_node_for_t forNode; /*!< For node */
         ast_node_while_t whileNode; /*!< While node */
-        ast_node_do_while_t doWhileNode; /*!< Do while node */
+        ast_node_repeat_until_t repeatUntilNode; /*!< Do while node */
         ast_node_foreach_t foreachNode; /*!< Foreach node */
         ast_node_if_t ifNode; /*!< If node */
         ast_node_variable_t variable; /*!< Variable node */
         ast_node_array_t array; /*!< Array node */
         ast_node_string_t string; /*!< String node */
-        ast_node_constant_t constant; /*!< Constant node */
+        ast_node_literal_t literal; /*!< Constant node */
         ast_node_operator_t operator; /*!< Operator node */
-        ast_node_declaration_t declaration; /*!< Declaration node */
+        ast_node_var_declaration_t varDeclarationNode; /*!< Declaration node */
     } _udata;
 } ast_node_t;
 
 /**
- * @struct ast_stack_t
- * @brief A stack of AST nodes used to keep track of the nodes that have been visited
+ * @struct ast_iterator_t
+ * @brief AST iterator structure
+ * This structure is used to iterate over the AST nodes.
  */
-typedef struct __ast_stack_t {
-    ast_node_t *node; /*!< AST node */
-    struct __ast_stack_t *next; /*!< Next node in the stack */
-} ast_stack_t;
+typedef struct {
+    linked_list_t *stack; /*!< Stack of nodes */
+    linked_list_node_t *current; /*!< Current node in the stack */
+} ast_iterator_t;
 
 /**
  * @fn ast_node_t *create_ast_node(ast_node_type_t type)
@@ -317,40 +317,37 @@ ast_node_t *create_ast_array_node(char *name, ast_node_t *index);
 ast_node_t *create_ast_string_node(char *value);
 
 /**
- * @fn ast_node_t *create_ast_constant_node(char *value)
- * @brief Create a new AST constant node
- * @param value Constant value
- * @return A new AST constant node
+ * @fn ast_node_t *create_ast_literal_node(char *value)
+ * @brief Create a new AST literal node
+ * @param value literal value
+ * @return A new AST literal node
  */
-ast_node_t *create_ast_constant_node(char *value);
+ast_node_t *create_ast_literal_node(char *value);
 
 /**
- * @fn ast_node_t *create_ast_block_node(ast_node_t **nodes, size_t nodesLen)
+ * @fn ast_node_t *create_ast_block_node()
  * @brief Create a new AST block node
  * @return A new AST block node
  */
-ast_node_t *create_ast_block_node(ast_node_t **nodes, size_t nodesLen);
+ast_node_t *create_ast_block_node();
 
 /**
- * @fn ast_node_t *create_ast_function_node(char *name, ast_node_t **args, size_t argsLen, ast_node_t *body)
+ * @fn ast_node_t *create_ast_function_node(char *name, type_type_t returnType, ast_node_t *body)
  * @brief Create a new AST function node
  * @param name Function name
- * @param args Function arguments
- * @param argsLen Number of arguments
+ * @param returnType Function return type
  * @param body Function body
  * @return A new AST function node
  */
-ast_node_t *create_ast_function_node(char *name, ast_node_t **args, size_t argsLen, ast_node_t *body);
-
+ast_node_t *create_ast_function_node(char *name, type_type_t returnType, ast_node_t *body)
+;
 /**
- * @fn ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t argsLen)
+ * @fn ast_node_t *create_ast_function_call_node(char *name)
  * @brief Create a new AST function call node
  * @param name Function name
- * @param args Function arguments
- * @param argsLen Number of arguments
  * @return A new AST function call node
  */
-ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t argsLen);
+ast_node_t *create_ast_function_call_node(char *name);
 
 /**
  * @fn ast_node_t *create_ast_return_node(ast_node_t *value)
@@ -361,15 +358,15 @@ ast_node_t *create_ast_function_call_node(char *name, ast_node_t **args, size_t 
 ast_node_t *create_ast_return_node(ast_node_t *value);
 
 /**
- * @fn ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *increment, ast_node_t *body)
+ * @fn ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *step, ast_node_t *body)
  * @brief Create a new AST for node
  * @param init Initialization
  * @param condition Condition
- * @param increment Increment
+ * @param step Step
  * @param body Body
  * @return A new AST for node
  */
-ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *increment, ast_node_t *body);
+ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_node_t *step, ast_node_t *body);
 
 /**
  * @fn ast_node_t *create_ast_while_node(ast_node_t *condition, ast_node_t *body)
@@ -381,13 +378,13 @@ ast_node_t *create_ast_for_node(ast_node_t *init, ast_node_t *condition, ast_nod
 ast_node_t *create_ast_while_node(ast_node_t *condition, ast_node_t *body);
 
 /**
- * @fn ast_node_t *create_ast_do_while_node(ast_node_t *condition, ast_node_t *body)
- * @brief Create a new AST do while node
+ * @fn ast_node_t *create_ast_repeat_until_node(ast_node_t *condition, ast_node_t *body)
+ * @brief Create a new AST repeat until node
  * @param condition Condition
  * @param body Body
- * @return A new AST do while node
+ * @return A new AST repeat until node
  */
-ast_node_t *create_ast_do_while_node(ast_node_t *condition, ast_node_t *body);
+ast_node_t *create_ast_repeat_until_node(ast_node_t *condition, ast_node_t *body);
 
 /**
  * @fn ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast_node_t *body)
@@ -410,6 +407,16 @@ ast_node_t *create_ast_foreach_node(ast_node_t *variable, ast_node_t *array, ast
 ast_node_t *create_ast_if_node(ast_node_t *condition, ast_node_t *trueBranch, ast_node_t *falseBranch);
 
 /**
+ * @fn ast_node_t *create_ast_var_declaration_node(char *name, type_type_t type, ast_node_t *init)
+ * @brief Create a new AST declaration node
+ * @param name Variable name
+ * @param type Variable type
+ * @param init Initialization
+ * @return A new AST declaration node
+ */
+ast_node_t *create_ast_var_declaration_node(char *name, type_type_t type, ast_node_t *init);
+
+/**
  * @fn char is_leaf(ast_node_t *node)
  * @brief check if the node is a leaf based on the node type
  * @note a node is considered a leaf if it has a node type greater than AST_NODE_LEAVES
@@ -423,7 +430,7 @@ char is_leaf(ast_node_t *node);
  * @param node AST node
  * @return void
  */
-void free_ast_node(ast_node_t *node);
+char free_ast_node(ast_node_t *node);
 
 /**
  * @fn const char *str_ast_node_type(ast_node_type_t type)
@@ -450,45 +457,6 @@ const char *str_op_type(op_type_t type);
 void append_ast_node(ast_node_t *parent, ast_node_t *child);
 
 /**
- * @fn ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack)
- * @brief Get the next node in the AST tree
- * @param node Current node
- * @param stack Stack of nodes
- * @return The next node
- * @note When the function is called for the first time, the stack must be NULL.
- * The stack is used to keep track of the nodes that have been visited.
- * @note this function return NULL when there is no more node to visit
- * if so, the stack is freed and set to NULL automatically.
- * @warning the stack must not be modified by external functions or the behavior is undefined.
- */
-ast_node_t *next_ast_node(ast_node_t *node, ast_stack_t **stack);
-
-/**
- * @fn void free_ast_stack(ast_stack_t *stack)
- * @brief Free an AST stack
- * @param stack AST stack
- * @return void
- */
-void free_ast_stack(ast_stack_t *stack);
-
-/**
- * @fn add_to_ast_stack(ast_stack_t **stack, ast_node_t *node)
- * @brief Add a node to the AST stack
- * @param stack AST stack
- * @param node AST node
- * @return void
- */
-void push_ast_stack(ast_stack_t **stack, ast_node_t *node);
-
-/**
- * @fn ast_node_t *pop_ast_stack(ast_stack_t **stack)
- * @brief Pop a node from the AST stack
- * @param stack AST stack
- * @return The popped node
- */
-ast_node_t *pop_ast_stack(ast_stack_t **stack);
-
-/**
  * @fn gviz_ast_node(ast_node_t *node, FILE *file)
  * @brief Generate a Graphviz file from an AST node
  * @param node AST node
@@ -497,6 +465,41 @@ ast_node_t *pop_ast_stack(ast_stack_t **stack);
  */
 void gviz_ast_node(ast_node_t *node, FILE *file);
 
+/**
+ * @fn ast_iterator_t *create_ast_iterator(ast_node_t *root)
+ * @brief Create a new AST iterator
+ * @param root Root node
+ * @return A new AST iterator
+ * @note The iterator is initialized to the first node of the tree
+ */
+ast_iterator_t *create_ast_iterator(ast_node_t *root);
+
+/**
+ * @fn ast_node_t *next_ast_node(ast_iterator_t *iterator)
+ * @brief Get the next node in the tree
+ * @param iterator AST iterator
+ * @return The next node in the tree
+ * @note The iterator is updated to the next node
+ */
+ast_node_t *next_ast_node(ast_iterator_t *iterator);
+
+/**
+ * @fn void free_ast_iterator(ast_iterator_t *iterator)
+ * @brief Free an AST iterator
+ * @param iterator AST iterator
+ * @return void
+ */
+void free_ast_iterator(ast_iterator_t *iterator);
+
+/**
+ * @char *get_edge_label(ast_node_t *parent, ast_node_t *child)
+ * @brief Get the label of the edge between two nodes
+ * @param parent Parent node
+ * @param child Child node
+ * @return The label of the edge
+ * @warning the label is allocated on the heap and must be freed by the user
+ */
+const char *get_edge_label(ast_node_t *parent, ast_node_t *child);
 
 
 #endif // AST_H
