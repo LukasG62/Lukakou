@@ -187,6 +187,22 @@ token_t next_token(lexer_t *lexer) {
         return token;
     }
 
+    // Check if the character is a [ => array_start token
+    if(lexer->content[currCursor] == '[') {
+        token.type = TOKEN_ARRAY_OPEN;
+        lexer->cursor++;
+        token.textLen = 1;
+        return token;
+    }
+
+    // Check if the character is a ] => array_end token
+    if(lexer->content[currCursor] == ']') {
+        token.type = TOKEN_ARRAY_CLOSE;
+        lexer->cursor++;
+        token.textLen = 1;
+        return token;
+    }
+
     // At this point we don't know what the token is
     token.type = TOKEN_UNKNOWN;
     lexer->cursor++;
@@ -221,6 +237,16 @@ const char *str_token_type(token_type_t type) {
             return "SEPARATOR";
         case TOKEN_COMMENT: /*!< Comment token */
             return "COMMENT";
+        case TOKEN_DATATYPE: /*!< Data type token */
+            return "DATATYPE";
+        case TOKEN_SPECIAL_VARIABLE: /*!< Special variable token */
+            return "SPECIAL_VARIABLE";
+
+        case TOKEN_ARRAY_OPEN: /*!< Array open token */
+            return "ARRAY_OPEN";
+
+        case TOKEN_ARRAY_CLOSE: /*!< Array close token */
+            return "ARRAY_CLOSE";
     }
     return "UNKNOWN";
 }
@@ -312,6 +338,27 @@ void read_identifier(lexer_t *lexer, token_t *token) {
     if(custom_strnstr(LEXER_LOGICAL_OPERATORS, token->text, token->textLen) != NULL) {
         // We set the token type to TOKEN_OPERATOR
         token->type = TOKEN_OPERATOR;
+        return;
+    }
+
+    // The actual text may be an arithmetic operator so we check if it is
+    if(custom_strnstr(LEXER_ARITHMETIC_OPERATORS, token->text, token->textLen) != NULL) {
+        // We set the token type to TOKEN_OPERATOR
+        token->type = TOKEN_OPERATOR;
+        return;
+    }
+
+    // The actual text may be a data type so we check if it is
+    if(custom_strnstr(LEXER_DATATYPE, token->text, token->textLen) != NULL) {
+        // We set the token type to TOKEN_DATATYPE
+        token->type = TOKEN_DATATYPE;
+        return;
+    }
+
+    // The actual text may be a special variable so we check if it is
+    if(custom_strnstr(LEXER_SPECIAL_VARIABLES, token->text, token->textLen) != NULL) {
+        // We set the token type to TOKEN_SPECIAL_VARIABLE
+        token->type = TOKEN_SPECIAL_VARIABLE;
         return;
     }
 
